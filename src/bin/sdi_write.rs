@@ -46,24 +46,71 @@ fn sdi_write(mut buf: &[u8]) {
     }
 }
 
+const HEX: &[u8; 16] = b"0123456789abcdef";
+const DEC: &[u8; 10] = b"0123456789";
+
+fn sdi_byte(v: u8) {
+    let mut buf = [0u8; 2];
+    for i in 0..2 {
+        buf[1 - i] = HEX[((v >> (i * 4)) & 0xf) as usize];
+    }
+    sdi_write(&buf);
+}
+
 fn sdi_uint(v: u32) {
-    const DEC: &[u8; 10] = b"0123456789";
-    let mut buf = [0u8; 11];
+    let mut buf = [0u8; 10];
     for i in 0..10 {
         buf[9 - i] = DEC[((v / 10_u32.pow(i as u32)) % 10) as usize];
     }
-    buf[10] = b'\n';
     sdi_write(&buf);
 }
 
 fn sdi_hex(v: u32) {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut buf = [0u8; 9];
+    let mut buf = [0u8; 8];
     for i in 0..8 {
         buf[7 - i] = HEX[((v >> (i * 4)) & 0xf) as usize];
     }
-    buf[8] = b'\n';
     sdi_write(&buf);
+}
+
+fn sdi_nl() {
+    sdi_write(b"\n");
+}
+
+fn chip_info() {
+    // Chip
+    let chip_id = hal::signature::chip_id();
+    sdi_write(b">> CHIP: ");
+    sdi_write(chip_id.name().as_bytes());
+    sdi_write(b" DevID: ");
+    sdi_hex(chip_id.dev_id() as u32);
+    sdi_nl();
+    // Flash
+    sdi_write(b">> FLASH_SIZE: ");
+    sdi_uint(hal::signature::flash_size_kb() as u32);
+    sdi_write(b"kb");
+    sdi_nl();
+    // Unique ID
+    let chip_id = hal::signature::unique_id();
+    sdi_write(b">> CHIP_ID: ");
+    for i in 0..12 {
+        sdi_byte(chip_id[i]);
+        if i < 11 {
+            sdi_write(b":");
+        }
+    }
+    sdi_nl();
+    // Clocks
+    let clocks = hal::rcc::clocks();
+    sdi_write(b">> CLOCKS: sysclk=");
+    sdi_uint(clocks.sysclk.0);
+    sdi_write(b" hclk=");
+    sdi_uint(clocks.hclk.0);
+    sdi_write(b" pclk1=");
+    sdi_uint(clocks.pclk1.0);
+    sdi_write(b" pclk2=");
+    sdi_uint(clocks.pclk2.0);
+    sdi_nl();
 }
 
 #[qingke_rt::entry]
@@ -75,10 +122,15 @@ fn main() -> ! {
     let p = hal::init(config);
     let mut delay = Delay;
 
-    let rst = hal::pac::RCC.rstsckr().read();
     sdi_write(b">> INIT\n");
+    // Reset
+    let rst = hal::pac::RCC.rstsckr().read();
     sdi_write(b">> RST: ");
     sdi_hex(rst.0);
+    sdi_nl();
+
+    chip_info();
+
     // Clear RST and DATA0 (for sdi_write)
     hal::pac::RCC.rstsckr().modify(|w| w.set_rmvf(true)); // clear for next time
     unsafe { write_volatile(DATA0, 0) };
@@ -93,17 +145,25 @@ fn main() -> ! {
 
     let mut n = 0_u32;
     loop {
-        if n > 20 {
+        if n > 100 {
             led.set_low();
             panic!("Bye");
         }
+
         led.toggle();
-        let _tick = hal::pac::SYSTICK.cnt().read();
-        sdi_write(b">> TICK: ");
+
+        sdi_write(b">> COUNT: ");
         sdi_uint(n);
+        let tick = hal::pac::SYSTICK.cnt().read();
+        sdi_write(b" / SYSTICK: ");
+        sdi_uint(tick);
+        sdi_nl();
+
         if button.is_high() {
             sdi_write(b">> BUTTON HIGH\n");
+            sdi_nl();
         }
+
         delay.delay_ms(250);
         n += 1;
     }
