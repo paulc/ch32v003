@@ -6,11 +6,13 @@
 use core::ptr::{read_volatile, write_volatile};
 
 use ch32_hal as hal;
+#[cfg(feature = "ufmt")]
 use core::convert::Infallible;
 use hal::debug::SDIPrint;
 use hal::delay::Delay;
 use hal::gpio::{Input, Level, Output, Pull};
 use portable_atomic::{AtomicBool, Ordering};
+#[cfg(feature = "ufmt")]
 use ufmt::uWrite;
 
 const DATA0: *mut u32 = 0xE000_00F4 as *mut u32;
@@ -19,8 +21,10 @@ const SPIN_LIMIT: u32 = 100_000; // ~50ms @ 8MHz
 
 static SDI_ALIVE: AtomicBool = AtomicBool::new(true);
 
+#[cfg(feature = "ufmt")]
 pub struct Sdi;
 
+#[cfg(feature = "ufmt")]
 impl uWrite for Sdi {
     type Error = Infallible;
 
@@ -30,9 +34,18 @@ impl uWrite for Sdi {
     }
 }
 
+#[cfg(feature = "ufmt")]
 macro_rules! sdi_println {
     ($($arg:tt)*) => {
         { let _ = ufmt::uwriteln!(&mut $crate::Sdi, $($arg)*); }
+    };
+}
+
+#[cfg(not(feature = "ufmt"))]
+macro_rules! sdi_println {
+    ($fmt:literal) => {};
+    ($fmt:literal, $($arg:expr),* $(,)?) => {
+        { $( let _ = &$arg; )* }
     };
 }
 
@@ -65,6 +78,17 @@ fn sdi_write(mut buf: &[u8]) {
     }
 }
 
+fn sdi_hex(v: u32) {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut buf = [0u8; 9];
+    for i in 0..8 {
+        buf[7 - i] = HEX[((v >> (i * 4)) & 0xf) as usize];
+    }
+    buf[8] = b'\n';
+    sdi_write(&buf);
+}
+
+#[cfg(feature = "ufmt")]
 fn chip_info() {
     // Chip
     let chip_id = hal::signature::chip_id();
@@ -98,6 +122,7 @@ fn main() -> ! {
     let rst = hal::pac::RCC.rstsckr().read();
     sdi_println!(">> RST: 0x{:x}", rst.0);
 
+    #[cfg(feature = "ufmt")]
     chip_info();
 
     // Clear RST and DATA0 (for sdi_write)

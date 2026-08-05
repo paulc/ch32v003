@@ -3,6 +3,9 @@ name = "ch32v003"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+ufmt = []
+
 [dependencies]
 ch32-hal = { git = "https://github.com/ch32-rs/ch32-hal",
     version = "0.1.0",
