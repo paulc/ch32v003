@@ -6,16 +6,35 @@
 use core::ptr::{read_volatile, write_volatile};
 
 use ch32_hal as hal;
+use core::convert::Infallible;
 use hal::debug::SDIPrint;
 use hal::delay::Delay;
 use hal::gpio::{Input, Level, Output, Pull};
 use portable_atomic::{AtomicBool, Ordering};
+use ufmt::uWrite;
 
 const DATA0: *mut u32 = 0xE000_00F4 as *mut u32;
 const DATA1: *mut u32 = 0xE000_00F8 as *mut u32;
 const SPIN_LIMIT: u32 = 100_000; // ~50ms @ 8MHz
 
 static SDI_ALIVE: AtomicBool = AtomicBool::new(true);
+
+pub struct Sdi;
+
+impl uWrite for Sdi {
+    type Error = Infallible;
+
+    fn write_str(&mut self, s: &str) -> Result<(), Infallible> {
+        sdi_write(s.as_bytes());
+        Ok(())
+    }
+}
+
+macro_rules! sdi_println {
+    ($($arg:tt)*) => {
+        { let _ = ufmt::uwriteln!(&mut $crate::Sdi, $($arg)*); }
+    };
+}
 
 fn sdi_write(mut buf: &[u8]) {
     if !SDI_ALIVE.load(Ordering::Relaxed) {
@@ -46,71 +65,23 @@ fn sdi_write(mut buf: &[u8]) {
     }
 }
 
-const HEX: &[u8; 16] = b"0123456789abcdef";
-const DEC: &[u8; 10] = b"0123456789";
-
-fn sdi_byte(v: u8) {
-    let mut buf = [0u8; 2];
-    for i in 0..2 {
-        buf[1 - i] = HEX[((v >> (i * 4)) & 0xf) as usize];
-    }
-    sdi_write(&buf);
-}
-
-fn sdi_uint(v: u32) {
-    let mut buf = [0u8; 10];
-    for i in 0..10 {
-        buf[9 - i] = DEC[((v / 10_u32.pow(i as u32)) % 10) as usize];
-    }
-    sdi_write(&buf);
-}
-
-fn sdi_hex(v: u32) {
-    let mut buf = [0u8; 8];
-    for i in 0..8 {
-        buf[7 - i] = HEX[((v >> (i * 4)) & 0xf) as usize];
-    }
-    sdi_write(&buf);
-}
-
-fn sdi_nl() {
-    sdi_write(b"\n");
-}
-
 fn chip_info() {
     // Chip
     let chip_id = hal::signature::chip_id();
-    sdi_write(b">> CHIP: ");
-    sdi_write(chip_id.name().as_bytes());
-    sdi_write(b" DevID: ");
-    sdi_hex(chip_id.dev_id() as u32);
-    sdi_nl();
+    sdi_println!(">> CHIP: {} / DevID: {}", chip_id.name(), chip_id.dev_id());
     // Flash
-    sdi_write(b">> FLASH_SIZE: ");
-    sdi_uint(hal::signature::flash_size_kb() as u32);
-    sdi_write(b"kb");
-    sdi_nl();
+    sdi_println!(">> FLASH_SIZE: {}kb", hal::signature::flash_size_kb());
     // Unique ID
-    let chip_id = hal::signature::unique_id();
-    sdi_write(b">> CHIP_ID: ");
-    for i in 0..12 {
-        sdi_byte(chip_id[i]);
-        if i < 11 {
-            sdi_write(b":");
-        }
-    }
-    sdi_nl();
+    sdi_println!(">> CHIP_ID: {:?}", hal::signature::unique_id());
     // Clocks
     let clocks = hal::rcc::clocks();
-    sdi_write(b">> CLOCKS: sysclk=");
-    sdi_uint(clocks.sysclk.0);
-    sdi_write(b" hclk=");
-    sdi_uint(clocks.hclk.0);
-    sdi_write(b" pclk1=");
-    sdi_uint(clocks.pclk1.0);
-    sdi_write(b" pclk2=");
-    sdi_uint(clocks.pclk2.0);
-    sdi_nl();
+    sdi_println!(
+        ">> CLOCKS: sysclk={} hclk={} pclk1={} pclk2={}",
+        clocks.sysclk.0,
+        clocks.hclk.0,
+        clocks.pclk1.0,
+        clocks.pclk2.0
+    );
 }
 
 #[qingke_rt::entry]
@@ -122,12 +93,10 @@ fn main() -> ! {
     let p = hal::init(config);
     let mut delay = Delay;
 
-    sdi_write(b">> INIT\n");
+    sdi_println!(">> INIT");
     // Reset
     let rst = hal::pac::RCC.rstsckr().read();
-    sdi_write(b">> RST: ");
-    sdi_hex(rst.0);
-    sdi_nl();
+    sdi_println!(">> RST: 0x{:x}", rst.0);
 
     chip_info();
 
@@ -152,16 +121,11 @@ fn main() -> ! {
 
         led.toggle();
 
-        sdi_write(b">> COUNT: ");
-        sdi_uint(n);
         let tick = hal::pac::SYSTICK.cnt().read();
-        sdi_write(b" / SYSTICK: ");
-        sdi_uint(tick);
-        sdi_nl();
+        sdi_println!(">> TICK: {} [{}]", n, tick);
 
         if button.is_high() {
-            sdi_write(b">> BUTTON HIGH\n");
-            sdi_nl();
+            sdi_println!(">> BUTTON HIGH");
         }
 
         delay.delay_ms(250);
