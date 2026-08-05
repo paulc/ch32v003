@@ -1,0 +1,15 @@
+[build]
+target = "riscv32ec-unknown-none-elf.json"
+
+[target.'cfg(all(target_arch = "riscv32", target_os = "none"))']
+runner = "wlink flash --enable-sdi-print --watch-serial"
+
+[unstable]
+build-std = ["core"]
+build-std-features = ["compiler-builtins-mem"]
+json-target-spec = true
+
+[target."riscv32ec-unknown-none-elf"]
+rustflags = [
+#  "-C", "link-arg=-Tlink.x",
+]
