@@ -1,6 +1,6 @@
 use ch32_hal as hal;
 
-use crate::sdi_println;
+use crate::{sdi_print, sdi_println};
 
 pub fn chip_info() {
     // Chip
@@ -26,4 +26,37 @@ pub fn chip_info() {
         &clocks.pclk1.0,
         &clocks.pclk2.0
     );
+}
+
+pub fn decode_reset(rst: u32) {
+    sdi_print!(">> RST: 0x{:x} ", rst);
+    if rst & (1 << 26) != 0 {
+        sdi_print!(" PIN");
+    }
+    if rst & (1 << 27) != 0 {
+        sdi_print!(" POR");
+    }
+    if rst & (1 << 28) != 0 {
+        sdi_print!(" SFT");
+    }
+    if rst & (1 << 29) != 0 {
+        sdi_print!(" IWDG");
+    }
+    if rst & (1 << 30) != 0 {
+        sdi_print!(" WWDG");
+    }
+    if rst & (1 << 31) != 0 {
+        sdi_print!(" LPWR");
+    }
+    sdi_print!("\n");
+}
+
+pub fn decode_mcause() {
+    let mcause: u32;
+    let mepc: u32;
+    unsafe {
+        core::arch::asm!("csrr {}, mcause", out(reg) mcause);
+        core::arch::asm!("csrr {}, mepc",   out(reg) mepc);
+    }
+    sdi_println!(">> MCAUSE: 0x{:x} MEPC: 0x{:x}", mcause, mepc);
 }

@@ -14,7 +14,7 @@ ufmt = []
 [dependencies]
 ch32-hal = { git = "https://github.com/ch32-rs/ch32-hal",
     version = "0.1.0",
-    features = ["ch32v003f4u6","memory-x","embassy","time-driver-tim2","rt"]
+    features = ["ch32v003f4u6","memory-x","embassy","time-driver-tim1","rt"]
 }
 embassy-embedded-hal = "0.6.0"
 embassy-executor = { version = "0.10.0", features = [
@@ -22,7 +22,7 @@ embassy-executor = { version = "0.10.0", features = [
     "executor-thread",
 ] }
 embassy-sync = "0.8.0"
-embassy-time = "0.5.1"
+embassy-time = { version = "0.5.1", features = ["tick-hz-32_768"] }
 
 # This is okay because we should automatically use whatever ch32-hal uses
 qingke = "0.7"
@@ -33,6 +33,9 @@ embedded-hal-async = "1.0.0"
 
 portable-atomic = "1.14.0"
 ufmt = "0.2.0"
+ssd1306 = { version = "0.10.0" }
+embedded-graphics = "0.8.2"
+heapless = { version = "0.9.3", features = ["ufmt"] }
 
 [profile.release]
 opt-level = "z"        # try "s" too — sometimes wins

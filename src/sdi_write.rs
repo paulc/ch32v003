@@ -8,10 +8,7 @@ const SPIN_LIMIT: u32 = 100_000; // ~50ms @ 8MHz
 
 static SDI_ALIVE: AtomicBool = AtomicBool::new(true);
 
-pub fn sdi_clear() {
-    unsafe { write_volatile(DATA0, 0) };
-}
-
+// Write to SDI but dont block if not connected
 pub fn sdi_write(mut buf: &[u8]) {
     if !SDI_ALIVE.load(Ordering::Relaxed) {
         return;
