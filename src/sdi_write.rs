@@ -49,66 +49,11 @@ macro_rules! sdi_writeln {
     };
 }
 
-// Formatting Traits - in most cases easier to use `ufmt`
-// (wont be linked if not used)
-
 const HEX: &[u8; 16] = b"0123456789abcdef";
-const DEC: &[u8; 10] = b"0123456789";
-
-pub trait FormatDec {
-    type Output: AsRef<[u8]>;
-    fn fmt_dec(self) -> Self::Output;
-}
 
 pub trait FormatHex {
     type Output: AsRef<[u8]>;
     fn fmt_hex(self) -> Self::Output;
-}
-
-impl FormatDec for u32 {
-    type Output = [u8; 10];
-    fn fmt_dec(self) -> Self::Output {
-        let mut buf = [b' '; 10];
-        if self == 0 {
-            buf[9] = b'0';
-            return buf;
-        }
-        let mut v = self;
-        let mut pos = 10;
-        while v > 0 {
-            pos -= 1;
-            buf[pos] = DEC[(v % 10) as usize];
-            v /= 10;
-        }
-        buf
-    }
-}
-
-impl FormatHex for u64 {
-    type Output = [u8; 18];
-    fn fmt_hex(self) -> [u8; 18] {
-        let bytes = self.to_be_bytes();
-        [
-            b'0',
-            b'x',
-            HEX[(bytes[0] >> 4) as usize],
-            HEX[(bytes[0] & 0xF) as usize],
-            HEX[(bytes[1] >> 4) as usize],
-            HEX[(bytes[1] & 0xF) as usize],
-            HEX[(bytes[2] >> 4) as usize],
-            HEX[(bytes[2] & 0xF) as usize],
-            HEX[(bytes[3] >> 4) as usize],
-            HEX[(bytes[3] & 0xF) as usize],
-            HEX[(bytes[4] >> 4) as usize],
-            HEX[(bytes[4] & 0xF) as usize],
-            HEX[(bytes[5] >> 4) as usize],
-            HEX[(bytes[5] & 0xF) as usize],
-            HEX[(bytes[6] >> 4) as usize],
-            HEX[(bytes[6] & 0xF) as usize],
-            HEX[(bytes[7] >> 4) as usize],
-            HEX[(bytes[7] & 0xF) as usize],
-        ]
-    }
 }
 
 impl FormatHex for u32 {
@@ -126,34 +71,6 @@ impl FormatHex for u32 {
             HEX[(bytes[2] & 0xF) as usize],
             HEX[(bytes[3] >> 4) as usize],
             HEX[(bytes[3] & 0xF) as usize],
-        ]
-    }
-}
-
-impl FormatHex for u16 {
-    type Output = [u8; 6];
-    fn fmt_hex(self) -> [u8; 6] {
-        let bytes = self.to_be_bytes();
-        [
-            b'0',
-            b'x',
-            HEX[(bytes[0] >> 4) as usize],
-            HEX[(bytes[0] & 0xF) as usize],
-            HEX[(bytes[1] >> 4) as usize],
-            HEX[(bytes[1] & 0xF) as usize],
-        ]
-    }
-}
-
-impl FormatHex for u8 {
-    type Output = [u8; 4];
-    fn fmt_hex(self) -> [u8; 4] {
-        let bytes = self.to_be_bytes();
-        [
-            b'0',
-            b'x',
-            HEX[(bytes[0] >> 4) as usize],
-            HEX[(bytes[0] & 0xF) as usize],
         ]
     }
 }

@@ -15,13 +15,19 @@ impl uWrite for Sdi {
 #[macro_export]
 macro_rules! sdi_println {
     ($($arg:tt)*) => {
-        { let _ = ufmt::uwriteln!(&mut $crate::ufmt::Sdi, $($arg)*); }
+        {
+            #[cfg(feature = "debug")]
+            let _ = ufmt::uwriteln!(&mut $crate::ufmt::Sdi, $($arg)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! sdi_print {
     ($($arg:tt)*) => {
-        { let _ = ufmt::uwrite!(&mut $crate::ufmt::Sdi, $($arg)*); }
+        {
+            #[cfg(feature = "debug")]
+            let _ = ufmt::uwrite!(&mut $crate::ufmt::Sdi, $($arg)*);
+        }
     };
 }
