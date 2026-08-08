@@ -57,7 +57,8 @@ impl<I: I2c> Ssd1306<I> {
     }
 
     async fn cmds(&mut self, c: &[u8]) -> Result<(), I::Error> {
-        let mut buf = [CMD; 8];
+        let mut buf = [0_u8; 8];
+        buf[0] = CMD;
         let n = c.len().min(7);
         buf[1..1 + n].copy_from_slice(&c[..n]);
         self.i2c.write(self.addr, &buf[..1 + n]).await

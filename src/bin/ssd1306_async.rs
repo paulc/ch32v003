@@ -10,7 +10,7 @@ use ch32_hal::peripherals::I2C1;
 use ch32_hal::time::Hertz;
 
 use embassy_executor::Spawner;
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 
 use ch32_util::chip_info::{chip_info, decode_mcause, decode_reset};
 use ch32_util::sdi_println;
@@ -33,24 +33,25 @@ async fn led_task(mut led: Output<'static>, interval_ms: u64) {
 }
 
 #[embassy_executor::task]
-async fn display_task(i2c: I2c<'static, I2C1, Async>) {
+async fn display_task(i2c: I2c<'static, I2C1, Async>, interval: u64) {
     sdi_println!("Init Display");
     let mut display = Ssd1306::new(i2c, 0x3C, Size::S128x64);
     display.init(Rotation::Deg0).await.ok();
     display.clear().await.ok();
     let mut buf = heapless::String::<16>::new();
     let mut count = 0_u32;
+    let mut ticker = Ticker::every(Duration::from_millis(interval));
     loop {
         // sdi_println!(">> Display: {}", count);
+        ticker.next().await;
         for line in 0..8 {
             buf.clear();
             let _ = ufmt::uwrite!(&mut buf, "LINE: {} <{}>", line, count);
             if display.write_line(line, buf.as_str()).await.is_err() {
                 sdi_println!("!! ERROR: write_line");
             }
-            count += 1;
         }
-        Timer::after_millis(10).await;
+        count += 1;
     }
 }
 
@@ -58,7 +59,8 @@ async fn display_task(i2c: I2c<'static, I2C1, Async>) {
 async fn main(spawner: Spawner) -> ! {
     SDIPrint::enable();
 
-    let config = ch32_hal::Config::default();
+    let mut config = ch32_hal::Config::default();
+    config.rcc = ch32_hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI;
     let p = ch32_hal::init(config);
 
     sdi_println!(">> INIT");
@@ -75,7 +77,7 @@ async fn main(spawner: Spawner) -> ! {
     let _button = Input::new(p.PC0, Pull::Down);
 
     sdi_println!("Start led_task");
-    match led_task(led, 100) {
+    match led_task(led, 500) {
         Ok(t) => spawner.spawn(t),
         Err(_) => panic!("Error spawning led_task"),
     }
@@ -103,7 +105,7 @@ async fn main(spawner: Spawner) -> ! {
     sdi_println!("Scan I2C bus: DONE");
 
     sdi_println!("Start led_task");
-    match display_task(i2c) {
+    match display_task(i2c,1000) {
         Ok(t) => spawner.spawn(t),
         Err(_) => panic!("Error spawning display_task"),
     }
@@ -118,4 +120,3 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     ch32_util::sdi_write::sdi_write(b"!! PANIC !!\n");
     loop {}
 }
-
